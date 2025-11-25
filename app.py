@@ -39,7 +39,7 @@ def load_live_schema():
 
 schema_info = load_live_schema()
 
-# --------------------- Gemini Setup ----------------------
+
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
     api_key=GEMINI_API_KEY,
