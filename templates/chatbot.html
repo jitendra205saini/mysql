@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LeadManagement Chatbot</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
+#chat-container { width: 90%; max-width: 600px; background: white; margin-top: 30px; border-radius: 10px; padding: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); height: 70vh; overflow-y: auto; }
+.message { margin: 8px 0; padding: 10px; border-radius: 7px; max-width: 80%; clear: both; white-space: pre-wrap; }
+.user { background: #dcf8c6; float: right; text-align: right; }
+.bot { background: #ececec; float: left; text-align: left; }
+#input-area { margin-top: 10px; display: flex; width: 90%; max-width: 600px; }
+#user-input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+button { padding: 10px 15px; margin-left: 5px; border-radius: 5px; border: none; background: #4caf50; color: white; cursor: pointer; }
+button:hover { background: #45a049; }
+</style>
+</head>
+<body>
+
+<h2> LeadManagement DB Chatbot</h2>
+
+<div id="chat-container"></div>
+
+<div id="input-area">
+  <input type="text" id="user-input" placeholder="Apna sawal likho..." />
+  <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+const chatContainer = document.getElementById("chat-container");
+
+function addMessage(sender, text) {
+  const div = document.createElement("div");
+  div.classList.add("message", sender);
+  div.textContent = text;
+  chatContainer.appendChild(div);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+async function sendMessage() {
+  const inputEl = document.getElementById("user-input");
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  addMessage("user", text);
+  inputEl.value = "";
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: text })
+    });
+
+    const data = await res.json();
+    let reply = "";
+    if (data.sql) reply += ` SQL: ${data.sql}\n`;
+    reply += ` Result: ${JSON.stringify(data.answer, null, 2)}`;
+    addMessage("bot", reply);
+  } catch (err) {
+    addMessage("bot", " Error: " + err.message);
+  }
+}
+</script>
+
+</body>
+</html>
