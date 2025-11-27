@@ -3,7 +3,6 @@ from flask_cors import CORS
 import mysql.connector
 import re
 import time
-
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -47,12 +46,20 @@ llm = ChatGoogleGenerativeAI(
 
 prompt = ChatPromptTemplate.from_messages([
     ("system",
-     "You output only SQL.\n" +
+     "You are an expert MySQL query generator.\n"
+     "Always output ONLY valid MySQL queries.\n"
+     "Never generate sqlite_master or SQLite syntax.\n"
+     "Database name: leadmanagement.\n"
+     "Rules:\n"
+     "- To list tables use: SHOW TABLES;\n"
+     "- To describe tables use: DESCRIBE table_name;\n"
+     "- Never use sqlite_master or PRAGMA.\n"
      "LIVE SCHEMA:\n" + schema_info),
     ("user", "{question}")
 ])
 
 chain = prompt | llm
+
 
 def handle_special(q):
     q1 = q.lower()
@@ -68,7 +75,7 @@ def handle_special(q):
         cur.close()
         conn.close()
         return str(count)
-    if "list tables" in q1:
+    if "list tables" in q1 or "sabhi table" in q1:
         cur.execute("SHOW TABLES")
         data = cur.fetchall()
         tables = [t[0] for t in data]
@@ -78,6 +85,7 @@ def handle_special(q):
     cur.close()
     conn.close()
     return None
+
 
 def is_unsafe(sql):
     s = sql.lower().strip()
@@ -89,6 +97,7 @@ def is_unsafe(sql):
         return True
     return False
 
+
 def clean_sql(raw):
     raw = raw.replace("```sql", "").replace("```", "").strip()
     match = re.search(
@@ -99,6 +108,7 @@ def clean_sql(raw):
     if not match:
         return None
     return match.group(0).strip()
+
 
 def execute_sql(sql):
     try:
@@ -119,13 +129,16 @@ def execute_sql(sql):
     except Exception as e:
         return {"error": str(e)}
 
+
 @app.route("/")
 def index():
     return render_template("chatbot.html")
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     global schema_info, prompt, chain
+
     user_text = request.json.get("question", "")
     session_id = request.remote_addr
 
@@ -144,7 +157,14 @@ def chat():
     schema_info = load_live_schema()
     prompt = ChatPromptTemplate.from_messages([
         ("system",
-         "You output only SQL.\n" +
+         "You are an expert MySQL query generator.\n"
+         "Always output ONLY valid MySQL queries.\n"
+         "Never generate sqlite_master or SQLite syntax.\n"
+         "Database name: leadmanagement.\n"
+         "Rules:\n"
+         "- To list tables use: SHOW TABLES;\n"
+         "- To describe tables use: DESCRIBE table_name;\n"
+         "- Never use sqlite_master or PRAGMA.\n"
          "LIVE SCHEMA:\n" + schema_info),
         ("user", "{question}")
     ])
@@ -158,13 +178,11 @@ def chat():
 
     if is_unsafe(sql):
         pending_confirm[session_id] = {"sql": sql, "time": time.time()}
-        return jsonify({
-            "answer": "This operation is dangerous. Type YES to confirm.",
-            "sql": sql
-        })
+        return jsonify({"answer": "This operation is dangerous. Type YES to confirm.", "sql": sql})
 
     result = execute_sql(sql)
     return jsonify({"answer": result, "sql": sql})
+
 
 if __name__ == "__main__":
     app.run(debug=True)
