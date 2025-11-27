@@ -6,7 +6,7 @@
 <title>LeadManagement Chatbot</title>
 
 <style>
-/* ----------- GLOBAL STYLE ----------- */
+
 body {
   font-family: 'Segoe UI', Arial, sans-serif;
   background: #0f0f0f;
@@ -31,7 +31,7 @@ h2 {
   text-shadow: 0 0 8px rgba(255,255,255,0.2);
 }
 
-/* ----------- CHAT CONTAINER ----------- */
+
 #chat-container {
   width: 90%;
   max-width: 1100px;
@@ -73,7 +73,7 @@ h2 {
   border-bottom-left-radius: 4px;
 }
 
-/* -------- TYPING INDICATOR -------- */
+
 .typing {
   width: 60px;
   height: 14px;
@@ -98,7 +98,7 @@ h2 {
   40% { opacity: 1; }
 }
 
-/* -------- INPUT AREA -------- */
+
 #input-area {
   width: 90%;
   max-width: 1100px;
@@ -133,7 +133,7 @@ button {
 
 button:hover { background: #43a047; }
 
-/* -------- TABLE STYLE -------- */
+
 .styled-table {
   width: 100%;
   border-collapse: collapse;
@@ -159,7 +159,7 @@ button:hover { background: #43a047; }
 tbody tr:nth-child(even) { background: #2d2d2d; }
 tbody tr:hover { background: #383838; }
 
-/* Confirm highlight */
+
 .pending-confirm {
   background: #ffd54f !important;
   color: black !important;
@@ -180,14 +180,13 @@ tbody tr:hover { background: #383838; }
 <script>
 const chatContainer = document.getElementById("chat-container");
 
-/* Escape HTML text */
+
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text || "";
   return div.innerHTML;
 }
 
-/* Add a message bubble */
 function addMessage(sender, content, highlight = false) {
   const div = document.createElement("div");
   div.classList.add("message", sender);
@@ -197,7 +196,7 @@ function addMessage(sender, content, highlight = false) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-/* Typing indicator */
+
 function showTyping() {
   const div = document.createElement("div");
   div.classList.add("message", "bot");
@@ -234,7 +233,7 @@ async function sendMessage() {
     let reply = "";
     let highlight = false;
 
-    /* SQL display */
+
     if (data.sql) {
       reply += `
         <strong style="color:#4caf50;">SQL:</strong>
@@ -246,7 +245,7 @@ async function sendMessage() {
 
     const ans = data.answer;
 
-    /* If table output */
+ 
     if (ans && ans.columns && ans.rows) {
       const columns = ans.columns;
       const rows = ans.rows;
