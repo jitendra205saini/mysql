@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import mysql.connector
 import re
+import time
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -9,30 +10,32 @@ from langchain_core.prompts import ChatPromptTemplate
 app = Flask(__name__)
 CORS(app)
 
-GEMINI_API_KEY = "AIzaSyD_SKzx_rUxC4sr8935wgTntyRb0zKO8Nc"
+GEMINI_API_KEY = "AIzaSyCdBwR5Nt8LFNKm0dzFrprak3Oh8UM9L6c"
 
-db_conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="@Jitu9351",
-    database="leadmanagement",
-    autocommit=True
-)
+pending_confirm = {}
 
-cursor = db_conn.cursor()
-
+def get_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="@Jitu9351",
+        database="leadmanagement"
+    )
 
 def load_live_schema():
-    cursor.execute("SHOW TABLES")
-    tables = [t[0] for t in cursor.fetchall()]
-    schema_text = "Database: leadmanagement\n"
-    for table in tables:
-        cursor.execute(f"DESCRIBE {table}")
-        rows = cursor.fetchall()
-        columns = ", ".join([r[0] for r in rows])
-        schema_text += f"Table: {table} ({columns})\n"
-    return schema_text
-
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SHOW TABLES")
+    tables = [t[0] for t in cur.fetchall()]
+    text = "Database: leadmanagement\n"
+    for t in tables:
+        cur.execute(f"DESCRIBE {t}")
+        rows = cur.fetchall()
+        cols = ", ".join([r[0] for r in rows])
+        text += f"Table: {t} ({cols})\n"
+    cur.close()
+    conn.close()
+    return text
 
 schema_info = load_live_schema()
 
@@ -44,38 +47,50 @@ llm = ChatGoogleGenerativeAI(
 
 prompt = ChatPromptTemplate.from_messages([
     ("system",
-     "You are a MySQL specialist. Output only VALID SQL queries.\n"
-     "No explanation. Only SQL.\n\n"
-     "LIVE Database Schema:\n" + schema_info),
+     "You output only SQL.\n" +
+     "LIVE SCHEMA:\n" + schema_info),
     ("user", "{question}")
 ])
 
 chain = prompt | llm
 
-
 def handle_special(q):
     q1 = q.lower()
-
-    if "which database" in q1 or "database name" in q1:
-        return "The database name is: leadmanagement"
-
-    if "how many tables" in q1 or "number of tables" in q1:
-        cursor.execute("SHOW TABLES")
-        return f"Total {len(cursor.fetchall())} tables are present."
-
-    if "list tables" in q1 or "table names" in q1:
-        cursor.execute("SHOW TABLES")
-        data = cursor.fetchall()
-        output = "Tables List:\n\n"
-        for i, t in enumerate(data, start=1):
-            output += f"{i}. {t[0]}\n"
-        return output
-
+    conn = get_connection()
+    cur = conn.cursor()
+    if "which database" in q1:
+        cur.close()
+        conn.close()
+        return "leadmanagement"
+    if "how many tables" in q1:
+        cur.execute("SHOW TABLES")
+        count = len(cur.fetchall())
+        cur.close()
+        conn.close()
+        return str(count)
+    if "list tables" in q1:
+        cur.execute("SHOW TABLES")
+        data = cur.fetchall()
+        tables = [t[0] for t in data]
+        cur.close()
+        conn.close()
+        return {"tables": tables}
+    cur.close()
+    conn.close()
     return None
 
+def is_unsafe(sql):
+    s = sql.lower().strip()
+    if "drop table" in s:
+        return True
+    if "delete" in s and "where" not in s:
+        return True
+    if s.startswith("update") and "where" not in s:
+        return True
+    return False
 
 def clean_sql(raw):
-    raw = raw.replace("```sql", "").replace("```", "")
+    raw = raw.replace("```sql", "").replace("```", "").strip()
     match = re.search(
         r"(select|insert|update|delete|create|alter|drop|show)[\s\S]+",
         raw,
@@ -83,59 +98,73 @@ def clean_sql(raw):
     )
     if not match:
         return None
-    sql = match.group(0).strip()
-    return sql
-
+    return match.group(0).strip()
 
 def execute_sql(sql):
     try:
-        cursor.execute(sql)
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(sql)
         if sql.lower().startswith(("select", "show")):
-            rows = cursor.fetchall()
-            if not rows:
-                return "No data found."
-            return "\n".join(", ".join(str(c) for c in r) for r in rows)
-        return "Query executed successfully."
+            rows = cur.fetchall()
+            cols = [desc[0] for desc in cur.description]
+            rows_dict = [dict(zip(cols, r)) for r in rows]
+            cur.close()
+            conn.close()
+            return {"columns": cols, "rows": rows_dict}
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success"}
     except Exception as e:
-        return f"SQL Error: {str(e)}"
-
+        return {"error": str(e)}
 
 @app.route("/")
 def index():
     return render_template("chatbot.html")
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
     global schema_info, prompt, chain
+    user_text = request.json.get("question", "")
+    session_id = request.remote_addr
 
-    schema_info = load_live_schema()
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system",
-         "You are a MySQL specialist. Output only VALID SQL.\n"
-         "No explanation. Only SQL.\n\n"
-         "LIVE Database Schema:\n" + schema_info),
-        ("user", "{question}")
-    ])
-
-    chain = prompt | llm
-
-    question = request.json.get("question", "")
-
-    special = handle_special(question)
+    special = handle_special(user_text)
     if special:
         return jsonify({"answer": special})
 
-    raw = chain.invoke({"question": question}).content
-    sql = clean_sql(raw)
+    if user_text.strip().upper() == "YES":
+        if session_id in pending_confirm:
+            sql_to_run = pending_confirm[session_id]["sql"]
+            del pending_confirm[session_id]
+            result = execute_sql(sql_to_run)
+            return jsonify({"answer": result, "sql": sql_to_run})
+        return jsonify({"answer": "No pending confirmation."})
 
-    if sql is None:
-        return jsonify({"answer": "The AI did not generate a valid SQL query."})
+    schema_info = load_live_schema()
+    prompt = ChatPromptTemplate.from_messages([
+        ("system",
+         "You output only SQL.\n" +
+         "LIVE SCHEMA:\n" + schema_info),
+        ("user", "{question}")
+    ])
+    chain = prompt | llm
+
+    ai_raw = chain.invoke({"question": user_text}).content
+    sql = clean_sql(ai_raw)
+
+    if not sql:
+        return jsonify({"answer": "No valid SQL generated."})
+
+    if is_unsafe(sql):
+        pending_confirm[session_id] = {"sql": sql, "time": time.time()}
+        return jsonify({
+            "answer": "This operation is dangerous. Type YES to confirm.",
+            "sql": sql
+        })
 
     result = execute_sql(sql)
     return jsonify({"answer": result, "sql": sql})
-
 
 if __name__ == "__main__":
     app.run(debug=True)
