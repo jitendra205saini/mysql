@@ -5,64 +5,206 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>LeadManagement Chatbot</title>
 <style>
-body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
-#chat-container { width: 90%; max-width: 600px; background: white; margin-top: 30px; border-radius: 10px; padding: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); height: 70vh; overflow-y: auto; }
-.message { margin: 8px 0; padding: 10px; border-radius: 7px; max-width: 80%; clear: both; white-space: pre-wrap; }
-.user { background: #dcf8c6; float: right; text-align: right; }
-.bot { background: #ececec; float: left; text-align: left; }
-#input-area { margin-top: 10px; display: flex; width: 90%; max-width: 600px; }
-#user-input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
-button { padding: 10px 15px; margin-left: 5px; border-radius: 5px; border: none; background: #4caf50; color: white; cursor: pointer; }
+body { 
+  font-family: 'Segoe UI', Arial, sans-serif; 
+  background: #121212; 
+  color: #e0e0e0; 
+  margin: 0; 
+  padding: 20px; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+}
+h2 { 
+  color: #ffffff; 
+  text-align: center; 
+  margin-bottom: 20px; 
+}
+#chat-container { 
+  width: 90%; 
+  max-width: 1100px; 
+  background: #1e1e1e; 
+  border-radius: 20px; 
+  padding: 30px; 
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+  height: 70vh; 
+  overflow-y: auto; 
+  margin-bottom: 20px; 
+}
+.message { 
+  margin: 20px 0; 
+  padding: 20px; 
+  border-radius: 18px; 
+  max-width: 95%; 
+  clear: both; 
+  word-wrap: break-word; 
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+}
+.user { 
+  background: #005c4b; 
+  color: #fff; 
+  float: right; 
+}
+.bot { 
+  background: #2d2d2d; 
+  color: #e0e0e0; 
+  float: left; 
+}
+#input-area { 
+  margin-top: 10px; 
+  display: flex; 
+  width: 90%; 
+  max-width: 1100px; 
+  background: #1e1e1e; 
+  padding: 15px; 
+  border-radius: 20px; 
+  box-shadow: 0 5px 20px rgba(0,0,0,0.4); 
+}
+#user-input { 
+  flex: 1; 
+  padding: 16px; 
+  border-radius: 15px; 
+  border: 1px solid #404040; 
+  background: #2d2d2d; 
+  color: #e0e0e0; 
+  font-size: 16px; 
+  outline: none; 
+}
+#user-input::placeholder { color: #888; }
+button { 
+  padding: 16px 32px; 
+  margin-left: 15px; 
+  border-radius: 15px; 
+  border: none; 
+  background: #4caf50; 
+  color: white; 
+  cursor: pointer; 
+  font-weight: bold; 
+  font-size: 16px; 
+}
 button:hover { background: #45a049; }
+
+/* Dark Table Style */
+.styled-table {
+  width: 100%; 
+  border-collapse: collapse; 
+  margin: 25px 0; 
+  font-size: 14px; 
+  background: #2d2d2d; 
+  border-radius: 12px; 
+  overflow: hidden; 
+  box-shadow: 0 5px 20px rgba(0,0,0,0.3); 
+}
+.styled-table thead { 
+  background: #1a73e8; 
+  color: white; 
+}
+.styled-table th, .styled-table td {
+  padding: 14px 12px; 
+  text-align: left; 
+  border-bottom: 1px solid #404040; 
+  color: #e0e0e0; 
+}
+.styled-table tbody tr:nth-child(even) { background: #363636; }
+.styled-table tbody tr:hover { background: #404040; }
+
+/* Pending Confirmation Highlight */
+.pending-confirm {
+  background: #ffcc00 !important;
+  color: #000 !important;
+}
 </style>
 </head>
 <body>
-
-<h2> LeadManagement DB Chatbot</h2>
-
+<h2>LeadManagement DB Chatbot</h2>
 <div id="chat-container"></div>
-
 <div id="input-area">
-  <input type="text" id="user-input" placeholder="Write your question..." />
+  <input type="text" id="user-input" placeholder="you have any questions" />
   <button onclick="sendMessage()">Send</button>
 </div>
 
 <script>
 const chatContainer = document.getElementById("chat-container");
 
-function addMessage(sender, text) {
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
+}
+
+function addMessage(sender, content, highlight=false) {
   const div = document.createElement("div");
   div.classList.add("message", sender);
-  div.textContent = text;
+  if(highlight) div.classList.add("pending-confirm");
+  div.innerHTML = content;
   chatContainer.appendChild(div);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 async function sendMessage() {
-  const inputEl = document.getElementById("user-input");
-  const text = inputEl.value.trim();
-  if (!text) return;
+  const input = document.getElementById("user-input");
+  const question = input.value.trim();
+  if (!question) return;
 
-  addMessage("user", text);
-  inputEl.value = "";
+  addMessage("user", escapeHtml(question));
+  input.value = "";
 
   try {
     const res = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: text })
+      body: JSON.stringify({ question })
     });
-
     const data = await res.json();
-    let reply = "";
-    if (data.sql) reply += ` SQL: ${data.sql}\n`;
-    reply += ` Result: ${JSON.stringify(data.answer, null, 2)}`;
-    addMessage("bot", reply);
-  } catch (err) {
-    addMessage("bot", " Error: " + err.message);
-  }
-}
-</script>
 
+    let reply = "";
+    let highlight = false;
+
+    if (data.sql) {
+      reply += `<strong style="color:#4caf50;">SQL:</strong> 
+      <code style="background:#363636;padding:12px 16px;border-radius:10px;display:block;margin:12px 0;font-size:13px;color:#e0e0e0;">
+        ${escapeHtml(data.sql)}
+      </code><br>`;
+    }
+
+    const answer = data.answer;
+
+    if (typeof answer === "object" && answer.columns && answer.rows) {
+      const columns = answer.columns || [];
+      const rows = answer.rows || [];
+
+      if (columns.length === 0 || rows.length === 0) {
+        reply += "No data found.";
+      } else {
+        const headerRow = columns.map(col => `<th>${escapeHtml(col)}</th>`).join("");
+        const bodyRows = rows.map(rowObj => {
+          return `<tr>${columns.map(col => `<td>${escapeHtml(rowObj[col] ?? "NULL")}</td>`).join("")}</tr>`;
+        }).join("");
+
+        reply += `<table class="styled-table">
+          <thead><tr>${headerRow}</tr></thead>
+          <tbody>${bodyRows}</tbody>
+        </table>`;
+        reply += `<small style="color:#888;float:right;margin-top:8px;">${rows.length} row${rows.length>1?'s':''} returned</small><div style="clear:both;"></div>`;
+      }
+    } else {
+      const answerStr = typeof answer === "string" ? answer : JSON.stringify(answer);
+      reply += answerStr.replace(/\n/g, "<br>");
+      if(answerStr.includes("dangerous") || answerStr.includes("YES to confirm")) highlight = true;
+    }
+
+    addMessage("bot", reply, highlight);
+
+  } catch (err) {
+    addMessage("bot", `<span style="color:#ff5722;">Error: ${escapeHtml(err.message)}</span>`);
+  }
+
+  input.focus();
+}
+
+document.getElementById("user-input").addEventListener("keypress", e => {
+  if (e.key === "Enter") sendMessage();
+});
+</script>
 </body>
 </html>
